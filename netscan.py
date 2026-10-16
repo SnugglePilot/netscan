@@ -1401,8 +1401,15 @@ def export_csv(c, q):
     w.writerow(["time_local"] + EXPORT_COLS)
     for r in c.execute("SELECT %s FROM samples WHERE ts>=? AND ts<=?%s ORDER BY ts" % (",".join(EXPORT_COLS), nf),
                        [frm, to] + args):
-        w.writerow([datetime.fromtimestamp(r["ts"]).strftime("%Y-%m-%d %H:%M:%S")] + list(r))
+        w.writerow([datetime.fromtimestamp(r["ts"]).strftime("%Y-%m-%d %H:%M:%S")] + [csv_cell(v) for v in r])
     return buf.getvalue()
+
+
+def csv_cell(v):
+    """Text that a spreadsheet would run as a formula (a Wi-Fi name like "=HYPERLINK(...)") gets a leading '."""
+    if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + v
+    return v
 
 
 # ---------------------------------------------------------------- web
@@ -1413,6 +1420,15 @@ MIME = {".html": "text/html; charset=utf-8", ".js": "application/javascript; cha
 API = {"/api/series": q_series, "/api/path": q_path, "/api/speedtests": q_speedtests, "/api/events": q_events,
        "/api/networks": q_networks, "/api/summary": q_summary, "/api/outages": q_outages, "/api/drops": q_drops,
        "/api/heatmap": q_heatmap}
+
+
+def local_name(host):
+    """True for a Host / Origin authority that names this machine's loopback, with any port."""
+    if not host:
+        return False
+    host = host.strip().lower()
+    name = host[1:host.find("]")] if host.startswith("[") else host.rsplit(":", 1)[0]
+    return name in ("127.0.0.1", "localhost", "::1")
 
 
 def make_handler(coll):
@@ -1437,7 +1453,16 @@ def make_handler(coll):
         def js(self, obj, code=200):
             self.send(code, json.dumps(obj, separators=(",", ":")))
 
+        def local_host(self):
+            """Refuse requests whose Host isn't loopback: blocks DNS-rebinding pages from reading the API."""
+            if local_name(self.headers.get("Host")):
+                return True
+            self.send(403, "forbidden", "text/plain")
+            return False
+
         def do_GET(self):
+            if not self.local_host():
+                return
             u = urlparse(self.path)
             q = {k: v[-1] for k, v in parse_qs(u.query).items()}
             p = u.path
@@ -1474,6 +1499,14 @@ def make_handler(coll):
                     pass
 
         def do_POST(self):
+            if not self.local_host():
+                return
+            # Cross-site pages can send "simple" POSTs without asking; requiring a JSON content type
+            # forces a CORS preflight (which we never approve), and a foreign Origin is refused outright.
+            origin = self.headers.get("Origin")
+            if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json" or \
+                    (origin is not None and not local_name(urlparse(origin).netloc)):
+                return self.js({"error": "forbidden"}, 403)
             u = urlparse(self.path)
             n = int(self.headers.get("Content-Length") or 0)
             try:

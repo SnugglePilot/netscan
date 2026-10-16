@@ -75,6 +75,24 @@ class RateLimited(unittest.TestCase):
         self.assertFalse(any(h["limited"] for h in chain))
 
 
+class LocalName(unittest.TestCase):
+    def test_only_loopback_names_pass(self):
+        for h in ("127.0.0.1:2325", "localhost:2325", "LOCALHOST", "[::1]:2325", "127.0.0.1"):
+            self.assertTrue(netscan.local_name(h), h)
+        for h in (None, "", "evil.example:2325", "127.0.0.1.evil.example:2325", "localhost.evil.example",
+                  "192.168.1.5:2325", "[::2]:2325"):
+            self.assertFalse(netscan.local_name(h), h)
+
+
+class CsvCell(unittest.TestCase):
+    def test_formulas_are_neutralised_numbers_are_not(self):
+        self.assertEqual(netscan.csv_cell('=HYPERLINK("x")'), "'=HYPERLINK(\"x\")")
+        self.assertEqual(netscan.csv_cell("@SUM(A1)"), "'@SUM(A1)")
+        self.assertEqual(netscan.csv_cell("Home WiFi"), "Home WiFi")
+        self.assertEqual(netscan.csv_cell(-44), -44)
+        self.assertIsNone(netscan.csv_cell(None))
+
+
 class Classify(unittest.TestCase):
     def test_status(self):
         c = netscan.Collector.__new__(netscan.Collector)

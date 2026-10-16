@@ -615,7 +615,7 @@
   async function rename(n) {
     const label = prompt("Name for this network (empty resets it):", n.custom_label ? n.label : "");
     if (label === null) return;
-    await fetch("/api/label", { method: "POST", body: JSON.stringify({ net_key: n.net_key, label }) });
+    await fetch("/api/label", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ net_key: n.net_key, label }) });
     load();
   }
 
@@ -766,7 +766,7 @@
     const b = $("speedtest");
     b.disabled = true;
     b.textContent = "Speed test running…";
-    try { await fetch("/api/speedtest", { method: "POST", body: "{}" }); } catch (e) { /* ignore */ }
+    try { await fetch("/api/speedtest", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) { /* ignore */ }
     setTimeout(() => { b.disabled = false; b.textContent = "Run speed test"; load(); }, 45000);
   });
   let rz;
