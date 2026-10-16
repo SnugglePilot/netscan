@@ -21,6 +21,10 @@ python3 netscan.py install                    # copies to ~/netscan/app, builds 
 open http://127.0.0.1:2325/
 ```
 
+The repository is private, so `git clone` asks for a GitHub login (username plus a
+personal access token, not the password). If that's awkward, download the ZIP from the
+repo page on github.com instead, unzip it, and run `python3 netscan.py install` inside it.
+
 No sudo and no packages needed. It starts at login, restarts if it crashes, and records
 whenever the Mac is awake. It does not keep the Mac awake: for round-the-clock data on a
 laptop, keep it plugged in and set *System Settings > Battery > Options > Prevent automatic
